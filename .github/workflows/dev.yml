@@ -60,14 +60,13 @@ jobs:
       - name: Update Helm Values
         uses: mikefarah/yq@v4.35.2
         with:
-          cmd: yq e '.spec.template.spec.containers[0].image = "${{ vars.ARTIFACT_REGISTRY_URL }}/${{ vars.IMAGE_NAME }}:${{ github.sha }}"' helm/dev/templates/deployment.yaml
+          cmd: yq e -i '.spec.template.spec.containers[0].image = "${{ vars.ARTIFACT_REGISTRY_URL }}/${{ vars.IMAGE_NAME }}:${{ github.sha }}"' helm/dev/templates/deployment.yaml
 
       - name: Setup Manifest repository
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git remote set-url --push origin https://github.com/ilhamhanifan/thecapstone-manifest.git
-          git checkout -b ${{ github.ref_name }}
 
       - name: Commit to Manifest repository
         run: |
