@@ -15,7 +15,7 @@ jobs:
     name: 'Build Image and Push to Docker ACR'
     # runs-on: [self-hosted, capstone]
     runs-on: ubuntu-latest
-    environment: dev
+    environment: ${{ github.ref_name }}
     steps:
       - name: Checkout
         uses: actions/checkout@v3
