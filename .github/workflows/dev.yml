@@ -61,7 +61,7 @@ jobs:
       - name: Update Helm Values
         uses: mikefarah/yq@v4.35.2
         with:
-          cmd: yq e -i '.spec.template.spec.containers[0].image = "${{ vars.ARTIFACT_REGISTRY_URL }}/${{ vars.IMAGE_NAME }}:${{ github.sha }}"' helm/dev/templates/deployment.yaml
+          cmd: yq e -i '.spec.template.spec.containers[0].image = "${{ vars.ARTIFACT_REGISTRY_URL }}/${{ vars.IMAGE_NAME }}:${{ github.sha }}"' helm/dev/values.yml
 
       - name: Setup Manifest repository
         run: |
