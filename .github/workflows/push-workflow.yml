@@ -1,11 +1,11 @@
-name: Feature Push Workflow
+name: Push Workflow
 
 on:
   push:
     branches:
       # - "feat/*"
       - "dev"
-      # - "main"
+      - "main"
 
 permissions:
   contents: read
@@ -57,11 +57,19 @@ jobs:
         with:
           repository: ilhamhanifan/thecapstone-manifest
           token: ${{ secrets.GH_PAT}}
-      
-      - name: Update Helm Values
+ 
+      ### Update Helm Values
+      - name: Update Helm Values for DEV
         uses: mikefarah/yq@v4.35.2
+        if: startsWith(github.ref, 'refs/heads/dev')
         with:
           cmd: yq e -i '.IMAGE_NAME = "${{ vars.ARTIFACT_REGISTRY_URL }}/${{ vars.IMAGE_NAME }}:${{ github.sha }}"' helm/dev/values.yaml
+
+      - name: Update Helm Values for PROD
+        uses: mikefarah/yq@v4.35.2
+        if: startsWith(github.ref, 'refs/heads/main')
+        with:
+          cmd: yq e -i '.IMAGE_NAME = "${{ vars.ARTIFACT_REGISTRY_URL }}/${{ vars.IMAGE_NAME }}:${{ github.sha }}"' helm/main/values.yaml
 
       - name: Setup Manifest repository
         run: |
