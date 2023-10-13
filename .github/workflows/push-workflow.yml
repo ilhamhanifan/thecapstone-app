@@ -1,0 +1,127 @@
+name: Push Workflow
+
+on:
+  push:
+    branches:
+      # - "feat/*"
+      - "dev"
+      - "main"
+
+permissions:
+  contents: read
+
+jobs:
+  build-image:
+    name: 'Build Image and Push to Docker ACR'
+    # runs-on: [self-hosted, capstone]
+    runs-on: ubuntu-latest
+    environment: dev
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - id: 'auth'
+        name: 'Authenticate to Google Cloud'
+        uses: 'google-github-actions/auth@v1'
+        with:
+          credentials_json: '${{ secrets.GOOGLE_CREDENTIALS }}'
+    
+      - name: 'Set up Cloud SDK'
+        uses: 'google-github-actions/setup-gcloud@v1'
+        
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          version: v0.10.0
+
+      - name: Configure Docker to use gcloud credentials
+        run: gcloud auth configure-docker ${{ vars.ARTIFACT_REGISTRY }}
+          
+      - name: Build docker image
+        run: |
+          docker build \
+          -t ${{ vars.ARTIFACT_REGISTRY_URL }}/${{ vars.IMAGE_NAME }}:${{ github.sha }} . 
+
+      - name: Push Docker image to GCR
+        run: docker push ${{ vars.ARTIFACT_REGISTRY_URL }}/${{ vars.IMAGE_NAME }}:${{ github.sha }}
+
+  update-manifest:
+    name: 'Update helm values'
+    # runs-on: [self-hosted, capstone]
+    runs-on: ubuntu-latest
+    environment: dev
+    needs: [build-image]
+    steps:
+      - name: fetch manifest repository
+        uses: actions/checkout@v3
+        with:
+          repository: ilhamhanifan/thecapstone-manifest
+          token: ${{ secrets.GH_PAT}}
+ 
+      ### Update Helm Values
+      - name: Update Helm Values for DEV
+        uses: mikefarah/yq@v4.35.2
+        if: startsWith(github.ref, 'refs/heads/dev')
+        with:
+          cmd: yq e -i '.IMAGE_NAME = "${{ vars.ARTIFACT_REGISTRY_URL }}/${{ vars.IMAGE_NAME }}:${{ github.sha }}"' helm/dev/values.yaml
+
+      - name: Update Helm Values for PROD
+        uses: mikefarah/yq@v4.35.2
+        if: startsWith(github.ref, 'refs/heads/main')
+        with:
+          cmd: yq e -i '.IMAGE_NAME = "${{ vars.ARTIFACT_REGISTRY_URL }}/${{ vars.IMAGE_NAME }}:${{ github.sha }}"' helm/main/values.yaml
+
+      - name: Setup Manifest repository
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git remote set-url --push origin https://github.com/ilhamhanifan/thecapstone-manifest.git
+
+      - name: Commit to Manifest repository
+        run: |
+          git add .
+          git commit -m "Update Helm Values"
+          git push origin HEAD
+      
+  # update-helm:
+  #   name: 'Update Helm Chart Manifest Repo'
+  #   # runs-on: [self-hosted, capstone]
+  #   runs-on: ubuntu-latest
+  #   environment: dev
+  #   needs: [ci]
+  #   steps:
+  #     - name: fetch manifest repository
+  #       uses: actions/checkout@v3
+  #       with:
+  #         repository: ilhamhanifan/thecapstone-manifest
+  #         path: ""
+  #         fetch-depth: 1
+
+  #     - name: update helm values
+  #       run: |
+  #         sed -i \
+  #           "s|==IMAGE_NAME==|${{ env.ARTIFACT_REGISTRY_URL }}/${{ env.IMAGE_NAME }}|" \
+  #           devops/helm/values.yaml
+
+  #     - name: setup repository
+  #       working-directory: ""
+  #       run: |
+  #         git fetch origin main
+  #         git config --global user.name "github-actions[bot]"
+  #         git config --global user.email "github-actions[bot]@users.noreply.github.com"
+  #         git remote set-url --push origin https://github.com/ilhamhanifan/capstone-manifest.git
+  #         git checkout -b ${{ github.ref_name }}
+
+  #     - name: commit
+  #       working-directory: ""
+  #       run: |
+  #         git add .
+  #         git commit -m "add new manifest"
+  #         git push origin HEAD
+  #     
+  #     - name: create PR
+  #       working-directory: ""
+  #       run: |
+  #         gh pr create -B main -H ${{ github.ref_name }} -t "deploy-${{ github.sha }}"
+
+
