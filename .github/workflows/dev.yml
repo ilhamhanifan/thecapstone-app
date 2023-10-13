@@ -3,13 +3,15 @@ name: Feature Push Workflow
 on:
   push:
     branches:
-      - "feat/*"
+      # - "feat/*"
+      - "dev"
+      # - "main"
 
 permissions:
   contents: read
 
 jobs:
-  ci:
+  build-image:
     name: 'Build Image and Push to Docker ACR'
     # runs-on: [self-hosted, capstone]
     runs-on: ubuntu-latest
@@ -43,6 +45,43 @@ jobs:
       - name: Push Docker image to GCR
         run: docker push ${{ vars.ARTIFACT_REGISTRY_URL }}/${{ vars.IMAGE_NAME }}:${{ github.sha }}
 
+  update-manifest:
+    name: 'Update helm values'
+    # runs-on: [self-hosted, capstone]
+    runs-on: ubuntu-latest
+    environment: dev
+    needs: [build-image]
+    steps:
+      - name: fetch manifest repository
+        uses: actions/checkout@v3
+        with:
+          repository: ilhamhanifan/thecapstone-manifest
+          path: ""
+          fetch-depth: 1
+
+      - name: Set Up yq
+        run: |
+          wget https://github.com/mikefarah/yq/releases/download/v4.35.2/yq_darwin_amd64 -O /usr/bin/yq
+          chmod +x /usr/bin/yq
+      
+      - name: Update Helm Values
+        run: |
+          IMAGE_NAME="${{ vars.ARTIFACT_REGISTRY_URL }}/${{ vars.IMAGE_NAME }}:${{ github.sha }}"
+          template.spec.containers[0].image = \"$IMAGE_NAME\"" helm/dev/templates/deployment.yamlyq e ".spec.template.
+
+      - name: Setup Manifest repository
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git remote set-url --push origin https://github.com/ilhamhanifan/thecapstone-manifest.git
+          git checkout -b ${{ github.ref_name }}
+
+      - name: Commit to Manifest repository
+        run: |
+          git add .
+          git commit -m "Update Helm Values"
+          git push origin HEAD
+      
   # update-helm:
   #   name: 'Update Helm Chart Manifest Repo'
   #   # runs-on: [self-hosted, capstone]
