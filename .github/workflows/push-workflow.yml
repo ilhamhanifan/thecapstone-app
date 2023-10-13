@@ -49,7 +49,7 @@ jobs:
     name: 'Update helm values'
     # runs-on: [self-hosted, capstone]
     runs-on: ubuntu-latest
-    environment: dev
+    environment: ${{ github.ref_name }}
     needs: [build-image]
     steps:
       - name: fetch manifest repository
